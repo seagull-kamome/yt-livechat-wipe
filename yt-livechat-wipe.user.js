@@ -267,7 +267,8 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
   // House keeping
   const HOUSE_KEEPING_INTERVAL_MS = 600 * 1000;
   const house_keeper = () => {
-    config.inspected_accounts.forEach(x => {
+    Object.keys(config.inspected_accounts).forEach(k => {
+      let x = config.inspected_accounts[k];
       if ('timestamps' in x) {
         Object.keys(x.timestamps)
           .filter(t => t < config.maximum_timestamp - (30 * 12))
