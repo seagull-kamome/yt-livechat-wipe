@@ -110,8 +110,8 @@ yt-live-chat-membership-item-renderer { display: none!important; }
 .ytlw-deleted-message-hidden yt-live-chat-item-list-renderer
 yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
 
-.ytlw-too-much-emoji-hideen yt-live-chat-item-list-renderer
-yt-live-chat-text-message-renderer[author-type=''].ytlw-too-much-emoji { display: none!important; }
+.ytlw-excess-emoji-hideen yt-live-chat-item-list-renderer
+yt-live-chat-text-message-renderer[author-type=''].ytlw-excess-emoji { display: none!important; }
 .ytlw-spoofing-hidden yt-live-chat-item-list-renderer .ytlw-spoofing { display: none!important; }
 
 ul.ytlw-dropdownmenu { list-style: none; overflow: none; }
@@ -149,12 +149,14 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     x.classList.toggle('ytlw-bann-accounts', (config.inspected_accounts[author_key] === 'BANN'));
     x.classList.toggle('ytlw-safe-accounts', (config.inspected_accounts[author_key] === 'SAFE'));
 
+    // Collect member list.
     const is_guest = xx.authorBadges.length == 0? true : false;
     if (! is_guest && !(author_name in config.inspected_members)) {
         console.log('Found member : ' + author_name + ' (' + author_key + ')');
         config.inspected_members[author_name] = { key: author_key };
     }
 
+    // Detect Spoofing.
     const is_spoofing = (author_name in config.inspected_members)? is_guest : false;
     if (is_spoofing) {
       config.detected_spammers[author_key] = {
@@ -166,12 +168,16 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 //    const message = x.querySelector('#message').innerText;
     const message = xx.message.runs.map(y => y.text || '').join('');
     const sanity_msg = message.replace(emoji_regexp, '');
+//    console.log(author_name + '\n' + sanity_msg + '\n' + message);
+
+    // Detect BANN words
     x.classList.toggle('ytlw-bann-words',   // test BANN words.
       (!!config.bann_words_regexp && config.bann_words !== ''
        && config.bann_words_regexp.test(author_name + '\n' + sanity_msg + '\n' + message)) );
 
-    x.classList.toggle('ytlw-too-much-emoji', (message.length - sanity_msg.length > ALLOWED_EMOJI_LIMIT));
-//    console.log(author_name + '\n' + sanity_msg + '\n' + message);
+    // Detect Emoji spam.
+    x.classList.toggle('ytlw-excess-emoji', (message.length - sanity_msg.length > ALLOWED_EMOJI_LIMIT));
+
 
     // Enable drag
     author_photo.ondragstart = e => {
@@ -240,7 +246,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         <input type='checkbox' name='banned-account' checked='checked' />Banned account
         <input type='checkbox' name='banned-words' checked='checked' />Banned word
         <input type='checkbox' name='deleted-message' checked='checked' />Deleted<br />
-        <input type='checkbox' name='too-much-emoji' checked='checked' />Too much emojis
+        <input type='checkbox' name='excess-emoji' checked='checked' />Excess emojis
         <input type='checkbox' name='spoofing' checked='checked' />Spoofing
       </div>
       <div>
