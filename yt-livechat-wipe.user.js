@@ -123,28 +123,26 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
   /* ********************************************************************** */
   // Message inspector
   const chatmessage_inspector = async x => {
-      // Extract author information, and check it.
       const author_photo = x.querySelector('#author-photo > img');
-      const author_photo_uri = author_photo.getAttribute('src') || '';
-      const author_name = x.querySelector('#author-name').innerText;
+//      const author_photo_uri = author_photo.getAttribute('src') || '';
+//      const author_name = x.querySelector('#author-name').innerText;
+      const author_photo_uri = x.__data.data.authorPhoto.thumbnails[0].url || '';
+      const author_name = x.__data.data.authorName.simpleText || '';
       const author_key = (y => {
           if (!y) { console.log('Unknown photo uri:' + author_photo_uri); }
           else { return author_name + '/' + (y[1]||y[3]) + '/' + (y[2]||'') }
         })(author_photo_uri.match(photouri_regexp));
+//      const post_time = x.querySelector('#timestamp').innerText;
+//      const message = x.querySelector('#message').innerText;
+      const message = x.__data.data.message.runs.map(y => y.text || '').join('');
+      const sanity_msg = message.replace(emoji_regexp, '');
 
       x.classList.toggle('ytlw-bann-accounts', (config.inspected_accounts[author_key] === 'BANN'));
       x.classList.toggle('ytlw-safe-accounts', (config.inspected_accounts[author_key] === 'SAFE'));
-
-      // Extract message text, and check it.
-      const post_time = x.querySelector('#timestamp').innerText;
-      const message = x.querySelector('#message').innerText;
-      const sanity_msg = message.replace(emoji_regexp, '');
-
       x.classList.toggle('ytlw-bann-words',
-        (!!config.bann_words_regexp && config.bann_words != ''
-         && (config.bann_words_regexp.test(author_name)
-             || config.bann_words_regexp,test(sanity_msg)
-             || config.bann_words_regexp.test(message)) ) );
+        (!!config.bann_words_regexp && config.bann_words !== ''
+         && config.bann_words_regexp.test(author_name + '\n' + sanity_msg + '\n' + message)) );
+//      console.log(author_name + '\n' + sanity_msg + '\n' + message);
 
       // Enable drag
       author_photo.ondragstart = e => {
@@ -181,31 +179,10 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
   <span>[BANN]</span>
 </button>
 
+
 <div class='ytlw-settings'>
   <div class='ytlw-panel' id='ytlw-setting-panel'>
-    <div class='ytlw-panel_box'>
-      <div>
-        <span>Hide by message type:</spam>
-      </div>
-      <div id='ytlw-popup-hide-by-member-type'>
-        <input type='checkbox' name='guest' checked='checked' />Guest
-        <input type='checkbox' name='member' checked='checked' />Member
-        <input type='checkbox' name='moderator' checked='checked' />Moderator
-        <input type='checkbox' name='owner' checked='checked' />Owner <br />
-        <input type='checkbox' name='superchat' checked='checked' />Super Chat
-        <input type='checkbox' name='supersticker' checked='checked' />Super Sticker
-        <input type='checkbox' name='membership' checked='checked' />Membership <br />
-        <input type='checkbox' name='banned-account' checked='checked' />Banned account
-        <input type='checkbox' name='banned-words' checked='checked' />Banned word
-        <input type='checkbox' name='deleted-message' checked='checked' />Deleted
-      </div>
-      <div>
-        <span>Bann words: (regexp)</span>
-        <button id='ytlw-popup-apply'>Save</button>
-      </div>
-      <div>
-        <textarea id='ytlw-popup-bannwords' rows='4' style='resize:holizontal; width:100%;'></textarea>
-      </div>
+    <div class='ytlw-panel-box'>
       <div>
         <spam>Drop user icon to categolize:</span>
       </dov>
@@ -219,6 +196,28 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
             <ul><li id='ytlw-cmd-show-safe-accounts'>Show</li>
                 <li id='ytlw-cmd-reset-safe-accounts'>Reset</li></ul></li>
         </ul>
+      </div>
+      <div>
+        <span>Hide by message type:</spam>
+      </div>
+      <div id='ytlw-popup-hide-by-member-type'>
+        <input type='checkbox' name='guest' checked='checked' />Guest
+        <input type='checkbox' name='member' checked='checked' />Member
+        <input type='checkbox' name='moderator' checked='checked' />Moderator
+        <input type='checkbox' name='owner' checked='checked' />Owner <br />
+        <input type='checkbox' name='superchat' checked='checked' />Super Chat
+        <input type='checkbox' name='supersticker' checked='checked' />Super Sticker
+        <input type='checkbox' name='membership' checked='checked' />Membership <br />
+        <input type='checkbox' name='banned-account' checked='checked' />Banned account
+        <input type='checkbox' name='banned-words' checked='checked' />Banned word
+        <input type='checkbox' name='deleted-message' checked='checked' />Deleted<br />
+      </div>
+      <div>
+        <span>Bann words: (regexp)</span>
+        <button id='ytlw-popup-apply'>Save</button>
+      </div>
+      <div>
+        <textarea id='ytlw-popup-bannwords' rows='4' style='resize:holizontal; width:100%;'></textarea>
       </div>
     </div>
   </div>
