@@ -145,7 +145,6 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     //
     // Query author info.
     //
-    const author_photo = x.querySelector('#author-photo > img');
 //    const author_photo_uri = author_photo.getAttribute('src') || '';
 //    const author_name = x.querySelector('#author-name').innerText;
     const author_photo_uri = xx.authorPhoto.thumbnails[0].url || '';
@@ -223,10 +222,25 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     //
     // Enable drag
     //
+    const author_photo = x.querySelector('#author-photo > img');
     author_photo.ondragstart = e => {
         e.dataTransfer.setData('text/ytlw-author-key', author_key);
         e.dataTransfer.setData('text/plain', author_key);
         e.dataTransfer.setData('text/uri-list', author_photo_uri);
+      };
+
+    //
+    // Enable click
+    //
+    author_photo.onclick = e => {
+      console.log('aaa');
+        document.getElementById('ytlw-author-info-name').innerText = author_name;
+        document.getElementById('ytlw-author-channel').setAttribute('href',
+          'https://youtube.com/channel/' + xx.authorExternalChannelId);
+        document.getElementById('ytlw-author-info-detail').innerText =
+          (author_info.typ||'')
+          + ' - ' + ((author_key in config.detected_spammers)? 'SPAMMER':'');
+        document.getElementById('ytlw-author-info-panel').style.visibility = 'visible';
       };
     };
   const force_inspect_all_messages = () => {
@@ -272,7 +286,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
   <div class='ytlw-panel' id='ytlw-setting-panel'>
     <div class='ytlw-panel-box'>
       <div>
-        <spam>Drop user icon to categolize:</span>
+        <p><spam>Drop user icon to categolize:</span></p>
       </dov>
       <div>
         <ul class='ytlw-dropdownmenu'>
@@ -286,7 +300,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         </ul>
       </div>
       <div>
-        <span>Hide by message type:</spam>
+        <p><span>Hide by message type:</spam></p>
       </div>
       <div id='ytlw-popup-hide-by-member-type'>
         <input type='checkbox' name='guest' checked='checked' />Guest
@@ -306,11 +320,23 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         <input type='checkbox' name='highrate-30' checked='checked' />Over ${MESSAGE_RATE_LIMIT_20} posts in 30 sec. <br />
       </div>
       <div>
-        <span>Bann words: (regexp)</span>
-        <button id='ytlw-popup-apply'>Save</button>
+        <p>
+          <span>Bann words: (regexp)</span>
+          <button id='ytlw-popup-apply'>Save</button>
+        </p>
       </div>
       <div>
         <textarea id='ytlw-popup-bannwords' rows='4' style='resize:holizontal; width:100%;'></textarea>
+      </div>
+      <div id='ytlw-author-info-panel' style='visibility: hidden;'>
+        <p>
+          Author info of
+          <a id='ytlw-author-channel' href='#'>
+            <span id='ytlw-author-info-name'></span>
+          </a> .
+          <button id='ytlw-btn-close-author-info-panel'>close</button>
+        </p>
+        <p id='ytlw-author-info-detail'></p>
       </div>
     </div>
   </div>
@@ -332,6 +358,10 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       // when popup button pressed, popup the panel.
       bann_word_textarea.value = config.bann_words;
       popup.style.visibility = (popup.style.visibility == 'visible')? 'hidden' : 'visible';
+    };
+
+  popup.querySelector('#ytlw-btn-close-author-info-panel').onclick = () => {
+      popup.querySelector('#ytlw-author-info-panel').style.visibility = 'hidden';
     };
 
   // Setting actions.
