@@ -16,6 +16,14 @@
 (function () {
   'use strict';
 
+  const MESSAGE_RATE_LIMIT_5 = 5;
+  const MESSAGE_RATE_LIMIT_10 = 7;
+  const MESSAGE_RATE_LIMIT_20 = 10;
+
+  const MESSAGE_BLOCK_RATE_LIMIT_5 = 6;
+  const MESSAGE_BLOCK_RATE_LIMIT_10 = 10;
+  const MESSAGE_BLOCK_RATE_LIMIT_20 = 20;
+
   /* ********************************************************************** */
   const photouri_regexp = new RegExp(
    '^https://yt3.ggpht.com/(?:([^/]*)/AAAAAAAAAAI/AAAAAAAAAAA/([^/]*)/.*/photo\.jpg$'
@@ -36,15 +44,16 @@
       bann_words: GM_getValue('YTLW_BANN_WORDS') || '',
       bann_words_regexp: null,
 
+      maximum_timestamp: 0,
       inspected_accounts: { },
       inspected_members: { },
 
-      detected_spammers: { }
+      detected_spammers: { },
     };
   (GM_getValue('YTLW_BANN_ACCOUNTS')||'').split(/\r?\n/g).forEach(
-      x => { config.inspected_accounts[x] = 'BANN'; });
+      x => { config.inspected_accounts[x] = { typ: 'BANN' }; });
   (GM_getValue('YTLW_SAFE_ACCOUNTS')||'').split(/\r?\n/g).forEach(
-      x => { config.inspected_accounts[x] = 'SAFE'; });
+      x => { config.inspected_accounts[x] = { typ: 'SAFE' }; });
 
 
   const fix_config = () => {
@@ -54,9 +63,9 @@
       // Save bann list.
       GM_setValue('YTLW_BANN_WORDS', config.bann_words);
       GM_setValue('YTLW_BANN_ACCOUNTS',
-        Object.keys(config.inspected_accounts).filter(x => config.inspected_accounts[x] === 'BANN').join("\n") );
+        Object.keys(config.inspected_accounts).filter(x => config.inspected_accounts[x].typ === 'BANN').join("\n") );
       GM_setValue('YTLW_SAFE_ACCOUNTS',
-        Object.keys(config.inspected_accounts).filter(x => config.inspected_accounts[x] === 'SAFE').join("\n") );
+        Object.keys(config.inspected_accounts).filter(x => config.inspected_accounts[x].typ === 'SAFE').join("\n") );
     };
   fix_config();
 
@@ -130,11 +139,11 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 
   /* ********************************************************************** */
   // Message inspector
-  const chatmessage_inspector = async x => {
+  const chatmessage_inspector = async (rescan, x) => {
     const xx = x.__data.data; // just for shorthand
 
     //
-    //
+    // Query author info.
     //
     const author_photo = x.querySelector('#author-photo > img');
 //    const author_photo_uri = author_photo.getAttribute('src') || '';
@@ -146,25 +155,57 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       if (!y) { console.log('Unknown photo uri:' + author_photo_uri); }
       else { return author_name + '/' + (y[1]||y[3]) + '/' + (y[2]||'') }
     })(author_photo_uri.match(photouri_regexp));
-    x.classList.toggle('ytlw-bann-accounts', (config.inspected_accounts[author_key] === 'BANN'));
-    x.classList.toggle('ytlw-safe-accounts', (config.inspected_accounts[author_key] === 'SAFE'));
-
-    // Collect member list.
     const is_guest = xx.authorBadges.length == 0? true : false;
+
+    let author_info = config.inspected_accounts[author_key];
+    x.classList.toggle('ytlw-bann-accounts', (author_info.typ === 'BANN'));
+    x.classList.toggle('ytlw-safe-accounts', (author_info.typ === 'SAFE'));
+
+    //
+    // Detect high rate posts.
+    //
+    const timestamp_5sec = xx.timestampUsec / 5000;
+    if (timestamp_5sec > config.maximum_timestamp)
+      config.maximum_timestamp = timestamp_5sec;
+
+    if (! ('timestamps' in author_info)) author_info.timestamps = { };
+    let author_timestamps = author_info.timestamps || { };
+    if (! rescan) {
+      // update timestamps
+      author_timestamps[timestamp_5sec] = (author_timestamps[timestamp_5sec] || 0) + 1;
+    }
+
+    const rate_5 = (author_timestamps[timestamp_5sec] || 0);
+    const rate_10 = rate_5 + (author_timestamps[timestamp_5sec - 1] || 0);
+    const rate_20 = rate_10
+                  + (author_timestamps[timestamp_5sec - 2] || 0)
+                  + (author_timestamps[timestamp_5sec - 3] || 0);
+    x.classList.toggle('ytlw-highrate-5', rate_5 > MESSAGE_RATE_LIMIT_5);
+    x.classList.toggle('ytlw-highrate-10', rate_10 > MESSAGE_RATE_LIMIT_10);
+    x.classList.toggle('ytlw-highrate-20', rate_20 > MESSAGE_RATE_LIMIT_20);
+
+
+    //
+    // Detect Spoofing.
+    //
     if (! is_guest && !(author_name in config.inspected_members)) {
         console.log('Found member : ' + author_name + ' (' + author_key + ')');
         config.inspected_members[author_name] = { key: author_key };
     }
-
-    // Detect Spoofing.
     const is_spoofing = (author_name in config.inspected_members)? is_guest : false;
-    if (is_spoofing) {
-      config.detected_spammers[author_key] = {
-        param: xx.contextMenuEndpoint.liveChatItemContextMenuEndpoint.param };
-    }
     x.classList.toggle('ytlw-spoofing', is_spoofing);
 
-//    const post_time = x.querySelector('#timestamp').innerText;
+
+
+    // Queue the spammer's channel to block.
+    if (is_spoofing
+      || rate_10 >= MESSAGE_BLOCK_RATE_LIMIT_10
+      || rate_20 > MESSAGE_BLOCK_RATE_LIMIT_20) {
+      config.detected_spammers[author_key] = {
+        msgid: xx.id,
+        param: xx.contextMenuEndpoint.liveChatItemContextMenuEndpoint.param };
+    }
+
 //    const message = x.querySelector('#message').innerText;
     const message = xx.message.runs.map(y => y.text || '').join('');
     const sanity_msg = message.replace(emoji_regexp, '');
@@ -175,11 +216,13 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       (!!config.bann_words_regexp && config.bann_words !== ''
        && config.bann_words_regexp.test(author_name + '\n' + sanity_msg + '\n' + message)) );
 
-    // Detect Emoji spam.
+    // Detect excess Emoji
     x.classList.toggle('ytlw-excess-emoji', (message.length - sanity_msg.length > ALLOWED_EMOJI_LIMIT));
 
 
+    //
     // Enable drag
+    //
     author_photo.ondragstart = e => {
         e.dataTransfer.setData('text/ytlw-author-key', author_key);
         e.dataTransfer.setData('text/plain', author_key);
@@ -188,7 +231,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     };
   const force_inspect_all_messages = () => {
       document.querySelectorAll('yt-live-chat-text-message-renderer, yt-live-chat-paid-message-renderer')
-        .forEach(chatmessage_inspector);
+        .forEach(x => chatmessage_inspector(true, x));
     };
 
   (new MutationObserver(xs => {
@@ -197,7 +240,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
             const nodename = y.nodeName.toLowerCase();
             if (nodename == 'yt-live-chat-text-message-renderer'
               || nodename == 'yt-live-chat-paid-message-renderer') {
-              chatmessage_inspector(y);
+              chatmessage_inspector(false, y);
             }
           });
       });
@@ -205,16 +248,26 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
                 , { childList: true, subtree: true });
 
 
+
+  /* ********************************************************************** */
+  // House keeping
+  const HOUSE_KEEPING_INTERVAL_MS = 600 * 1000;
+  const house_keeper = () => {
+    config.inspected_accounts.forEach(x => {
+      if ('timestamps' in x) {
+        Object.keys(x.timestamps)
+          .filter(t => t < config.maximum_timestamp - (30 * 12))
+          .forEach(t => delete x.timestamps[t]);
+      }
+    });
+    window.setTimeout(house_keeper, HOUSE_KEEPING_INTERVAL_MS);
+  };
+  window.setTimeout(house_keeper, HOUSE_KEEPING_INTERVAL_MS);
+
+
   /* ********************************************************************** */
   // Inject popup menu
   const popuphtml = `
-<button type='button' name='bannbutton' value='bannbutton'
-    class='ytlw-button ytlw-bann-button' ytlw-bann-type='BANN'
-    style="background: rgba(0,0,0,0);margin-left: 10px;white-space: nowrap;">
-  <span>[BANN]</span>
-</button>
-
-
 <div class='ytlw-settings'>
   <div class='ytlw-panel' id='ytlw-setting-panel'>
     <div class='ytlw-panel-box'>
@@ -247,7 +300,10 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         <input type='checkbox' name='banned-words' checked='checked' />Banned word
         <input type='checkbox' name='deleted-message' checked='checked' />Deleted<br />
         <input type='checkbox' name='excess-emoji' checked='checked' />Excess emojis
-        <input type='checkbox' name='spoofing' checked='checked' />Spoofing
+        <input type='checkbox' name='spoofing' checked='checked' />Spoofing<br />
+        <input type='checkbox' name='highrate-5' checked='checked' />Over ${MESSAGE_RATE_LIMIT_5} posts in 5 sec. <br />
+        <input type='checkbox' name='highrate-10' checked='checked' />Over ${MESSAGE_RATE_LIMIT_10} posts in 10 sec. <br />
+        <input type='checkbox' name='highrate-30' checked='checked' />Over ${MESSAGE_RATE_LIMIT_20} posts in 30 sec. <br />
       </div>
       <div>
         <span>Bann words: (regexp)</span>
@@ -301,10 +357,8 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 
           e.stopPropagation();
           e.preventDefault();
-          if (typ === 'NUTRAL') {
-            delete config.inspected_accounts[k];
-          } else if (typ === 'BANN' || typ == 'SAFE') {
-            config.inspected_accounts[k] = typ;
+          if (typ === 'BANN' || typ == 'SAFE' || typ == 'NUTRAL') {
+            config.inspected_accounts[k].typ = typ;
           } else { return ; }
 
           fix_config();
@@ -314,7 +368,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 
   const do_cmd_reset_account_list = k => {
       Object.keys(config.inspected_accounts).forEach(x => {
-          if (config.inspected_accounts[x] === k) { delete config.inspected_accounts[k]; } }); };
+          if (config.inspected_accounts[x].typ === k) { config.inspected_accounts[k].typ = 'NUTRAL'; } }); };
   document.querySelector('#ytlw-cmd-reset-bann-accounts').onclick = () => do_cmd_reset_account_list('BANN');
   document.querySelector('#ytlw-cmd-reset-safe-accounts').onclick = () => do_cmd_reset_account_list('SAFE');
 
