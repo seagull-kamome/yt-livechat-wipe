@@ -28,6 +28,7 @@
     + '|[\u2011-\u26FF]'
     + '|\uD83E[\uDD10-\uDDFF]', 'g');
 
+  const ALLOWED_EMOJI_LIMIT = 10;
 
   /* ********************************************************************** */
   // Manupukate configuration.
@@ -106,6 +107,9 @@ yt-live-chat-membership-item-renderer { display: none!important; }
 .ytlw-deleted-message-hidden yt-live-chat-item-list-renderer
 yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
 
+.ytlw-too-much-emoji-hideen yt-live-chat-item-list-renderer
+yt-live-chat-text-message-renderer[author-type=''].ytlw-too-much-emoji { display: none!important; }
+
 ul.ytlw-dropdownmenu { list-style: none; overflow: none; }
 ul.ytlw-dropdownmenu > li { display: inline-block; padding: 0 1ex 0 1ex;
    border:1px solid white; position: relative; }
@@ -142,6 +146,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       x.classList.toggle('ytlw-bann-words',
         (!!config.bann_words_regexp && config.bann_words !== ''
          && config.bann_words_regexp.test(author_name + '\n' + sanity_msg + '\n' + message)) );
+      x.classList.toggle('ytlw-too-much-emoji', (message.length - sanity_msg.length > ALLOWED_EMOJI_LIMIT));
 //      console.log(author_name + '\n' + sanity_msg + '\n' + message);
 
       // Enable drag
@@ -211,6 +216,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         <input type='checkbox' name='banned-account' checked='checked' />Banned account
         <input type='checkbox' name='banned-words' checked='checked' />Banned word
         <input type='checkbox' name='deleted-message' checked='checked' />Deleted<br />
+        <input type='checkbox' name='too-much-emoji' checked='checked' />Too much emoji
       </div>
       <div>
         <span>Bann words: (regexp)</span>
