@@ -4,7 +4,7 @@
 // @description Wipe junk messages out.
 // @author      HATTORI, Hiroki
 // @match       https://www.youtube.com/live_chat*
-// @version     1
+// @version     1.0.1
 // @require     https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js
 // @resource    toastrCSS https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css
 // @grant       GM_addStyle
@@ -48,15 +48,13 @@ yt-live-chat-text-message-renderer[author-type='member'] { display: none!importa
 yt-live-chat-text-message-renderer[author-type='moderator'] { display: none!important; }
 .ytlw-owner-hidden yt-live-chat-item-list-renderer
 yt-live-chat-text-message-renderer[author-type='owner'] { display: none!important; }
-.ytlw-superchat-hidden yt-live-chat-item-list-renderer
-yt-live-chat-text-message-renderer[author-type='superchat'] { display: none!important; }
 
 .ytlw-superchat-hidden yt-live-chat-item-list-renderer
-yt-live-chat-paied-message-renderer { display: none!important; }
+yt-live-chat-paid-message-renderer { display: none!important; }
 .ytlw-superstiker-hidden yt-live-chat-item-list-renderer
-yt-live-chat-paied-sticker-renderer { display: none!important; }
+yt-live-chat-paid-sticker-renderer { display: none!important; }
 .ytlw-membership-hidden yt-live-chat-item-list-renderer
-yt-live-chat-lagacy-paied-message-renderer { display: none!important; }
+yt-live-chat-membership-item-renderer { display: none!important; }
 `);
 
   /* ********************************************************************** */
@@ -100,7 +98,6 @@ yt-live-chat-lagacy-paied-message-renderer { display: none!important; }
   document.querySelectorAll("#ytlw-setting-panel input[type='checkbox']").forEach(function(x) {
       const c = 'ytlw-' + x.name + '-hidden';
       x.onchange = function () {
-        console.log('bbbb');
           if (x.checked) {
             document.body.classList.remove(c);
           } else {
