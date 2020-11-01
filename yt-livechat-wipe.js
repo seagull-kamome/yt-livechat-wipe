@@ -8,9 +8,26 @@
 // @require     https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js
 // @resource    toastrCSS https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css
 // @grant       GM_addStyle
+// @grant       GM_getValue
+// @grant       GM_setValue
 // @grant       GM_getResourceText
 // ==/UserScript==
 (function () {
+  /* ********************************************************************** */
+  // Manupukate configuration.
+  let config = {
+      bann_words: GM_getValue('YTLW_BANN_WORDS') || '',
+      bann_words_regexp: null
+    };
+  const fix_config = function() {
+    config.bann_words_regexp = new RegExp(
+      config.bann_words.replace(/\r?\n/g, '|'), 'i');
+
+    GM_setValue('YTLW_BANN_WORDS', config.bann_words);
+  };
+  fix_config();
+
+
   /* ********************************************************************** */
   // Inject stylesheet.
   GM_addStyle(GM_getResourceText('toasterCSS'));
@@ -55,7 +72,62 @@ yt-live-chat-paid-message-renderer { display: none!important; }
 yt-live-chat-paid-sticker-renderer { display: none!important; }
 .ytlw-membership-hidden yt-live-chat-item-list-renderer
 yt-live-chat-membership-item-renderer { display: none!important; }
+
+.ytlw-bann-word { display: none!important; }
 `);
+
+
+  /* ********************************************************************** */
+  // Message inspector
+  const chatmessage_inspector = async function(x) {
+      {
+        const nodename = x.nodeName.toLowerCase();
+        if (nodename != 'yt-live-chat-text-message-renderer'
+          && nodename != 'yt-live-chat-paid-message-renderer') { return ; }
+      }
+
+      x.classList.remove('ytlw-bann-words');
+      if (!config.bann_words_regexp || config.bann_words == '') { return ; }
+
+      // Extract message text and author information.
+      let message = '';
+      let author = '';
+      Array.from(x.children).some(function (y) {
+          if (y.id == 'content') {
+            y.querySelector('#message').innerHTML.split(/<imd|"/g)
+              .some(function(txt) {
+                  if (! txt.match('emoji style-scope yt-live-chat-text-message-renderer')) {
+                    message += txt;
+                  } });
+          } else if (y.id == 'author-photo') {
+            const r = (y.lastElementChild.getAttribute('src') || '').split('/')
+            author = r[3] + r[6];
+          } else if (y.id == 'card') {
+            author = y.querySelector('#author-name').innerText;
+            if (y.className.match('yt-live-chat-paid-message-renderer')) {
+              message += y.children[1].children[0].innerText;
+            }
+          }
+        });
+
+        // And check it
+        if (config.bann_words_regexp.test(author) || config.bann_words_regexp.test(message)) {
+          x.classList.add('ytlw-bann-words');
+        }
+    };
+  const force_inspect_all_messages = function() {
+      document.querySelectorAll('yt-live-chat-text-message-renderer')
+        .forEach(chatmessage_inspector);
+      document.querySelectorAll('yt-live-chat-paid-message-renderer')
+        .forEach(chatmessage_inspector);
+    };
+  force_inspect_all_messages();
+
+  (new MutationObserver(function (xs) {
+    xs.forEach(function (x) { x.addedNodes.forEach(chatmessage_inspector); });
+    })).observe(document.querySelector('yt-live-chat-app')
+                , { childList: true, subtree: true });
+
 
   /* ********************************************************************** */
   // Inject popup menu
@@ -64,9 +136,9 @@ yt-live-chat-membership-item-renderer { display: none!important; }
   <div class='ytlw-panel' id='ytlw-setting-panel'>
     <div class='ytlw-panel_box'>
       <div>
-        <span>Hide by member type.</spam>
+        <span>Hide by member type:</spam>
       </div>
-      <div>
+      <div id='ytlw-popup-hide-by-member-type'>
         <input type='checkbox' name='guest' checked='checked' />Guest
         <input type='checkbox' name='member' checked='checked' />Member
         <input type='checkbox' name='moderator' checked='checked' />Moderator
@@ -74,6 +146,15 @@ yt-live-chat-membership-item-renderer { display: none!important; }
         <input type='checkbox' name='superchat' checked='checked' />Super Chat
         <input type='checkbox' name='supersticker' checked='checked' />Super Sticker
         <input type='checkbox' name='membership' checked='checked' />Membership
+      </div>
+      <div>
+        <span>Bann words: (regexp)</span>
+      </div>
+      <div>
+        <textarea id='ytlw-popup-bannwords' rows='4' style='resize:holizontal; width:100%;'></textarea>
+      </div>
+      <div>
+        <button id='ytlw-popup-apply'>Apply</button>
       </div>
     </div>
   </div>
@@ -90,19 +171,29 @@ yt-live-chat-membership-item-renderer { display: none!important; }
   refbtn.insertAdjacentHTML('beforebegin', popuphtml);
 
   const popup = document.getElementById('ytlw-setting-panel');
+  const bann_word_textarea = popup.querySelector('#ytlw-popup-bannwords');
   document.getElementById('ytlw-setting-button').onclick = function() {
+      // when popup button pressed, popup the panel.
+      bann_word_textarea.value = config.bann_words;
       popup.style.visibility = (popup.style.visibility == 'visible')? 'hidden' : 'visible';
     };
 
   // Setting actions.
-  document.querySelectorAll("#ytlw-setting-panel input[type='checkbox']").forEach(function(x) {
-      const c = 'ytlw-' + x.name + '-hidden';
-      x.onchange = function () {
-          if (x.checked) {
-            document.body.classList.remove(c);
-          } else {
-            document.body.classList.add(c);
-          } }; });
+  document.querySelectorAll("#ytlw-popup-hide-by-member-type input[type='checkbox']")
+    .forEach(function(x) {
+        // when member type filter changed.
+        const c = 'ytlw-' + x.name + '-hidden';
+        x.onchange = function () {
+            if (x.checked) {
+              document.body.classList.remove(c);
+            } else {
+              document.body.classList.add(c);
+            } }; });
+  document.getElementById('ytlw-popup-apply').onclick = function(x) {
+      // when "Apply" pressed.
+      config.bann_words = bann_word_textarea.value;
+      fix_config();
+      force_inspect_all_messages(); };
 
 })();
 
