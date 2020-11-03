@@ -73,58 +73,44 @@ yt-live-chat-paid-sticker-renderer { display: none!important; }
 .ytlw-membership-hidden yt-live-chat-item-list-renderer
 yt-live-chat-membership-item-renderer { display: none!important; }
 
-.ytlw-bann-word { display: none!important; }
+.ytlw-bann-words { display: none!important; }
 `);
 
 
   /* ********************************************************************** */
   // Message inspector
   const chatmessage_inspector = async function(x) {
-      {
-        const nodename = x.nodeName.toLowerCase();
-        if (nodename != 'yt-live-chat-text-message-renderer'
-          && nodename != 'yt-live-chat-paid-message-renderer') { return ; }
-      }
-
       x.classList.remove('ytlw-bann-words');
-      if (!config.bann_words_regexp || config.bann_words == '') { return ; }
 
       // Extract message text and author information.
-      let message = '';
-      let author = '';
-      Array.from(x.children).some(function (y) {
-          if (y.id == 'content') {
-            y.querySelector('#message').innerHTML.split(/<imd|"/g)
-              .some(function(txt) {
-                  if (! txt.match('emoji style-scope yt-live-chat-text-message-renderer')) {
-                    message += txt;
-                  } });
-          } else if (y.id == 'author-photo') {
-            const r = (y.lastElementChild.getAttribute('src') || '').split('/')
-            author = r[3] + r[6];
-          } else if (y.id == 'card') {
-            author = y.querySelector('#author-name').innerText;
-            if (y.className.match('yt-live-chat-paid-message-renderer')) {
-              message += y.children[1].children[0].innerText;
-            }
-          }
-        });
+      const author_name = x.querySelector('#author-name').innerText;
+      const author_id = (function(y) { return y[3] + y[6]; })(
+        x.querySelector('#author-photo > img').getAttribute('src').split('/') );
+      const post_time = x.querySelector('#timestamp').innerText;
+      const message = x.querySelector('#message').innerText;
 
         // And check it
-        if (config.bann_words_regexp.test(author) || config.bann_words_regexp.test(message)) {
+        if (!!config.bann_words_regexp && config.bann_words != ''
+         && (config.bann_words_regexp.test(author_name) || config.bann_words_regexp.test(message)) ) {
           x.classList.add('ytlw-bann-words');
         }
     };
   const force_inspect_all_messages = function() {
-      document.querySelectorAll('yt-live-chat-text-message-renderer')
-        .forEach(chatmessage_inspector);
-      document.querySelectorAll('yt-live-chat-paid-message-renderer')
+      document.querySelectorAll('yt-live-chat-text-message-renderer, yt-live-chat-paid-message-renderer')
         .forEach(chatmessage_inspector);
     };
   force_inspect_all_messages();
 
   (new MutationObserver(function (xs) {
-    xs.forEach(function (x) { x.addedNodes.forEach(chatmessage_inspector); });
+    xs.forEach(function (x) {
+        x.addedNodes.forEach(function(y) {
+            const nodename = y.nodeName.toLowerCase();
+            if (nodename == 'yt-live-chat-text-message-renderer'
+              || nodename == 'yt-live-chat-paid-message-renderer') {
+              chatmessage_inspector(y);
+            }
+          });
+      });
     })).observe(document.querySelector('yt-live-chat-app')
                 , { childList: true, subtree: true });
 
