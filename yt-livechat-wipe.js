@@ -33,9 +33,6 @@
       config.bann_words.replace(/\r?\n/g, '|'), 'i');
 
     GM_setValue('YTLW_BANN_WORDS', config.bann_words);
-    GM_setValue('YTLW_BANN_ACCOUNTS',
-      Object.keys(config.inspected_accounts).filter(function(x) {
-          return config.inspected_accounts[x] === 'BANN'; }).join("\n") );
   };
   fix_config();
 
@@ -85,8 +82,10 @@ yt-live-chat-paid-sticker-renderer { display: none!important; }
 .ytlw-membership-hidden yt-live-chat-item-list-renderer
 yt-live-chat-membership-item-renderer { display: none!important; }
 
-.ytlw-bann-words { display: none!important; }
-.ytlw-bann-accounts { display: none!important; }
+.ytlw-banned-words-hidden yt-live-chat-item-list-renderer .ytlw-bann-words { display: none!important; }
+.ytlw-banned-account-hidden yt-live-chat-item-list-renderer .ytlw-bann-accounts { display: none!important; }
+.ytlw-deleted-message-hidden yt-live-chat-item-list-renderer[is-deleted] { display: none!important; }
+
 #ytlw-bann-button:-moz-drag-over { border: 1px solid black; }
 `);
 
@@ -97,7 +96,7 @@ yt-live-chat-membership-item-renderer { display: none!important; }
       x.classList.remove('ytlw-bann-words');
       x.classList.remove('ytlw-bann-accounts');
 
-      // Extract message text and author information.
+      // Extract author information, and check it.
       const author_photo = x.querySelector('#author-photo > img');
       const author_photo_uri = author_photo.getAttribute('src') || '';
       const author_id = (function(y) { return y[1] + '/' + y[2]; })(author_photo_uri.match(photouri_regexp));
@@ -106,10 +105,9 @@ yt-live-chat-membership-item-renderer { display: none!important; }
         x.classList.add('ytlw-bann-accounts');
       }
 
+      // Extract message text, and check it.
       const post_time = x.querySelector('#timestamp').innerText;
       const message = x.querySelector('#message').innerText;
-
-      // And check it
       if (!!config.bann_words_regexp && config.bann_words != ''
        && (config.bann_words_regexp.test(author_name) || config.bann_words_regexp.test(message)) ) {
         x.classList.add('ytlw-bann-words');
@@ -144,8 +142,8 @@ yt-live-chat-membership-item-renderer { display: none!important; }
   /* ********************************************************************** */
   // Inject popup menu
   const popuphtml = `
-<button type='button' name='bannbutton' value='bannbutton' class='ytlw-button'
-    id='ytlw-bann-button'
+<button type='button' name='bannbutton' value='bannbutton'
+    class='ytlw-button ytlw-bann-button' ytlw-bann-type='BANN'
     style="background: rgba(0,0,0,0);margin-left: 10px;white-space: nowrap;">
   <span>[BANN]</span>
 </button>
@@ -154,7 +152,7 @@ yt-live-chat-membership-item-renderer { display: none!important; }
   <div class='ytlw-panel' id='ytlw-setting-panel'>
     <div class='ytlw-panel_box'>
       <div>
-        <span>Hide by member type:</spam>
+        <span>Hide by message type:</spam>
       </div>
       <div id='ytlw-popup-hide-by-member-type'>
         <input type='checkbox' name='guest' checked='checked' />Guest
@@ -163,7 +161,10 @@ yt-live-chat-membership-item-renderer { display: none!important; }
         <input type='checkbox' name='owner' checked='checked' />Owner <br />
         <input type='checkbox' name='superchat' checked='checked' />Super Chat
         <input type='checkbox' name='supersticker' checked='checked' />Super Sticker
-        <input type='checkbox' name='membership' checked='checked' />Membership
+        <input type='checkbox' name='membership' checked='checked' />Membership <br />
+        <input type='checkbox' name='banned-account' checked='checked' />Banned account
+        <input type='checkbox' name='banned-words' checked='checked' />Banned word
+        <input type='checkbox' name='deleted-message' checked='checked' />Deleted
       </div>
       <div>
         <span>Bann words: (regexp)</span>
@@ -172,7 +173,16 @@ yt-live-chat-membership-item-renderer { display: none!important; }
         <textarea id='ytlw-popup-bannwords' rows='4' style='resize:holizontal; width:100%;'></textarea>
       </div>
       <div>
-        <button id='ytlw-popup-apply'>Apply</button>
+        <button id='ytlw-popup-apply'>Save</button>
+      </div>
+      <div>
+        <spam>Drop user icon to categolize:</span>
+      </dov>
+      <div>
+        <span class='ytlw-bann-button' ytlw-bann-type='BANN'>[BANN}</span>
+        : <span class='ytlw-bann-button' ytlw-bann-type='NUTRAL'>[NUTRAL]</span>
+        : <span class='ytlw-bann-button' ytlw-bann-type='SAFE'>[SAFE]</span>
+      </div>
       </div>
     </div>
   </div>
@@ -214,17 +224,30 @@ yt-live-chat-membership-item-renderer { display: none!important; }
       force_inspect_all_messages(); };
 
   // Bann button
-  const bannbutton = document.getElementById('ytlw-bann-button');
-  bannbutton.ondragover = function(e) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; };
-  bannbutton.ondrop = function (e) {
-      const xs = e.dataTransfer.getData('text/uri-list').match(photouri_regexp);
-      if (!xs) { return; }
+  const bannbutton = document.querySelectorAll('.ytlw-bann-button')
+    .forEach(function(elm) {
+       elm.ondragover = function(e) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; };
+       elm.ondrop = function (e) {
+          const xs = e.dataTransfer.getData('text/uri-list').match(photouri_regexp);
+          if (!xs) { return; }
 
-      e.stopPropagation();
-      e.preventDefault();
-      const author_id = xs[1] + '/' + xs[2];
-      config.inspected_accounts[e.dataTransfer.getData('text/plain') + '/' + author_id] = 'BANN';
-      force_inspect_all_messages();
-    };
+          e.stopPropagation();
+          e.preventDefault();
+          const k = e.dataTransfer.getData('text/plain') + '/' + xs[1] + '/' + xs[2];
+          const typ = elm.getAttribute('ytlw-bann-type') || 'ERROR';
+          if (typ === 'NUTRAL') {
+            delete config.inspected_accounts[k];
+          } else if (typ === 'BANN' || typ == 'SAFE') {
+            config.inspected_accounts[k] = typ;
+          } else { return ; }
+
+          // Save bann list.
+          GM_setValue('YTLW_BANN_ACCOUNTS',
+          Object.keys(config.inspected_accounts).filter(function(x) {
+              return config.inspected_accounts[x] === 'BANN'; }).join("\n") );
+
+          force_inspect_all_messages(); // Update view
+        };
+    });
 })();
 
