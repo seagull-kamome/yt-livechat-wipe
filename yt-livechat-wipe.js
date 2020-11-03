@@ -14,21 +14,33 @@
 // ==/UserScript==
 (function () {
   /* ********************************************************************** */
+  const photouri_regexp = new RegExp(
+    '^https://yt3.ggpht.com/([^/]*)/AAAAAAAAAAI/AAAAAAAAAAA/([^/]*)/.*/photo\.jpg$');
+
+  /* ********************************************************************** */
   // Manupukate configuration.
   let config = {
       bann_words: GM_getValue('YTLW_BANN_WORDS') || '',
-      bann_words_regexp: null
+      bann_words_regexp: null,
+
+      inspected_accounts: { },
     };
+  (GM_getValue('YTLW_BANN_ACCOUNTS')||'').split(/\r?\n/g).forEach(function (x) {
+      config.inspected_accounts[x] = 'BANN'; });
+
   const fix_config = function() {
     config.bann_words_regexp = new RegExp(
       config.bann_words.replace(/\r?\n/g, '|'), 'i');
 
     GM_setValue('YTLW_BANN_WORDS', config.bann_words);
+    GM_setValue('YTLW_BANN_ACCOUNTS',
+      Object.keys(config.inspected_accounts).filter(function(x) {
+          return config.inspected_accounts[x] === 'BANN'; }).join("\n") );
   };
   fix_config();
 
 
-  /* ********************************************************************** */
+ /* ********************************************************************** */
   // Inject stylesheet.
   GM_addStyle(GM_getResourceText('toasterCSS'));
   GM_addStyle(`
@@ -74,6 +86,8 @@ yt-live-chat-paid-sticker-renderer { display: none!important; }
 yt-live-chat-membership-item-renderer { display: none!important; }
 
 .ytlw-bann-words { display: none!important; }
+.ytlw-bann-accounts { display: none!important; }
+#ytlw-bann-button:-moz-drag-over { border: 1px solid black; }
 `);
 
 
@@ -81,19 +95,31 @@ yt-live-chat-membership-item-renderer { display: none!important; }
   // Message inspector
   const chatmessage_inspector = async function(x) {
       x.classList.remove('ytlw-bann-words');
+      x.classList.remove('ytlw-bann-accounts');
 
       // Extract message text and author information.
+      const author_photo = x.querySelector('#author-photo > img');
+      const author_photo_uri = author_photo.getAttribute('src') || '';
+      const author_id = (function(y) { return y[1] + '/' + y[2]; })(author_photo_uri.match(photouri_regexp));
+      if (config.inspected_accounts[author_id] === 'BANN') {
+        x.classList.add('ytlw-bann-accounts');
+      }
+
       const author_name = x.querySelector('#author-name').innerText;
-      const author_id = (function(y) { return y[3] + y[6]; })(
-        x.querySelector('#author-photo > img').getAttribute('src').split('/') );
       const post_time = x.querySelector('#timestamp').innerText;
       const message = x.querySelector('#message').innerText;
 
-        // And check it
-        if (!!config.bann_words_regexp && config.bann_words != ''
-         && (config.bann_words_regexp.test(author_name) || config.bann_words_regexp.test(message)) ) {
-          x.classList.add('ytlw-bann-words');
-        }
+      // And check it
+      if (!!config.bann_words_regexp && config.bann_words != ''
+       && (config.bann_words_regexp.test(author_name) || config.bann_words_regexp.test(message)) ) {
+        x.classList.add('ytlw-bann-words');
+      }
+
+      // Enable drag
+      author_photo.ondragstart = function (e) {
+          e.dataTransfer.setData('text/uri-list', author_photo_uri);
+          e.dataTransfer.setData('text/plain', author_photo_uri);
+        };
     };
   const force_inspect_all_messages = function() {
       document.querySelectorAll('yt-live-chat-text-message-renderer, yt-live-chat-paid-message-renderer')
@@ -118,6 +144,12 @@ yt-live-chat-membership-item-renderer { display: none!important; }
   /* ********************************************************************** */
   // Inject popup menu
   const popuphtml = `
+<button type='button' name='bannbutton' value='bannbutton' class='ytlw-button'
+    id='ytlw-bann-button'
+    style="background: rgba(0,0,0,0);margin-left: 10px;white-space: nowrap;">
+  <span>[BANN]</span>
+</button>
+
 <div class='ytlw-settings'>
   <div class='ytlw-panel' id='ytlw-setting-panel'>
     <div class='ytlw-panel_box'>
@@ -147,7 +179,7 @@ yt-live-chat-membership-item-renderer { display: none!important; }
 </div>
 <button type='button' name='panelbutton' value='panelbutton' class='ytlw-button'
     id='ytlw-setting-button'
-    style="background: rgba(0,0,0,0);margin-left: 10px;white-space: nowrap;">
+    style="background: rgba(0,0,0,0); white-space: nowrap;">
   <span>[Filter]</span>
 </button>`
 
@@ -181,5 +213,18 @@ yt-live-chat-membership-item-renderer { display: none!important; }
       fix_config();
       force_inspect_all_messages(); };
 
+  // Bann button
+  const bannbutton = document.getElementById('ytlw-bann-button');
+  bannbutton.ondragover = function(e) { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; };
+  bannbutton.ondrop = function (e) {
+      const xs = e.dataTransfer.getData('text/uri-list').match(photouri_regexp);
+      if (!xs) { return; }
+
+      e.stopPropagation();
+      e.preventDefault();
+      const author_id = xs[1] + '/' + xs[2];
+      config.inspected_accounts[author_id] = 'BANN';
+      force_inspect_all_messages();
+    };
 })();
 
