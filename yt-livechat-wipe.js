@@ -101,11 +101,11 @@ yt-live-chat-membership-item-renderer { display: none!important; }
       const author_photo = x.querySelector('#author-photo > img');
       const author_photo_uri = author_photo.getAttribute('src') || '';
       const author_id = (function(y) { return y[1] + '/' + y[2]; })(author_photo_uri.match(photouri_regexp));
-      if (config.inspected_accounts[author_id] === 'BANN') {
+      const author_name = x.querySelector('#author-name').innerText;
+      if (config.inspected_accounts[author_name + '/' + author_id] === 'BANN') {
         x.classList.add('ytlw-bann-accounts');
       }
 
-      const author_name = x.querySelector('#author-name').innerText;
       const post_time = x.querySelector('#timestamp').innerText;
       const message = x.querySelector('#message').innerText;
 
@@ -117,8 +117,8 @@ yt-live-chat-membership-item-renderer { display: none!important; }
 
       // Enable drag
       author_photo.ondragstart = function (e) {
+          e.dataTransfer.setData('text/plain', author_name);
           e.dataTransfer.setData('text/uri-list', author_photo_uri);
-          e.dataTransfer.setData('text/plain', author_photo_uri);
         };
     };
   const force_inspect_all_messages = function() {
@@ -223,7 +223,7 @@ yt-live-chat-membership-item-renderer { display: none!important; }
       e.stopPropagation();
       e.preventDefault();
       const author_id = xs[1] + '/' + xs[2];
-      config.inspected_accounts[author_id] = 'BANN';
+      config.inspected_accounts[e.dataTransfer.getData('text/plain') + '/' + author_id] = 'BANN';
       force_inspect_all_messages();
     };
 })();
