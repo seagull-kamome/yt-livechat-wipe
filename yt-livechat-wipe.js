@@ -67,9 +67,9 @@
 .toast { font-size: 14px; }
 
 .ytlw-guest-hidden yt-live-chat-item-list-renderer
-yt-live-chat-text-message-renderer[author-type=''] { display: none!important; }
+yt-live-chat-text-message-renderer[author-type='']:not(.ytlw-safe-accounts) { display: none!important; }
 .ytlw-member-hidden yt-live-chat-item-list-renderer
-yt-live-chat-text-message-renderer[author-type='member'] { display: none!important; }
+yt-live-chat-text-message-renderer[author-type='member']:not(.ytlw-safe-accounts) { display: none!important; }
 .ytlw-moderator-hidden yt-live-chat-item-list-renderer
 yt-live-chat-text-message-renderer[author-type='moderator'] { display: none!important; }
 .ytlw-owner-hidden yt-live-chat-item-list-renderer
@@ -84,7 +84,8 @@ yt-live-chat-membership-item-renderer { display: none!important; }
 
 .ytlw-banned-words-hidden yt-live-chat-item-list-renderer .ytlw-bann-words { display: none!important; }
 .ytlw-banned-account-hidden yt-live-chat-item-list-renderer .ytlw-bann-accounts { display: none!important; }
-.ytlw-deleted-message-hidden yt-live-chat-item-list-renderer[is-deleted] { display: none!important; }
+.ytlw-deleted-message-hidden yt-live-chat-item-list-renderer
+yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
 
 #ytlw-bann-button:-moz-drag-over { border: 1px solid black; }
 `);
@@ -95,14 +96,18 @@ yt-live-chat-membership-item-renderer { display: none!important; }
   const chatmessage_inspector = async function(x) {
       x.classList.remove('ytlw-bann-words');
       x.classList.remove('ytlw-bann-accounts');
+      x.classList.remove('ytlw-safe-accounts');
 
       // Extract author information, and check it.
       const author_photo = x.querySelector('#author-photo > img');
       const author_photo_uri = author_photo.getAttribute('src') || '';
       const author_id = (function(y) { return y[1] + '/' + y[2]; })(author_photo_uri.match(photouri_regexp));
       const author_name = x.querySelector('#author-name').innerText;
-      if (config.inspected_accounts[author_name + '/' + author_id] === 'BANN') {
+      const k = author_name + '/' + author_id;
+      if (config.inspected_accounts[k] === 'BANN') {
         x.classList.add('ytlw-bann-accounts');
+      } else if (config.inspected_accounts[k] === 'SAFE') {
+        x.classList.add('ytlw-safe-accounts');
       }
 
       // Extract message text, and check it.
