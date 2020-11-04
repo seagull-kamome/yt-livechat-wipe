@@ -5,6 +5,7 @@
 // @author      HATTORI, Hiroki
 // @match       https://www.youtube.com/live_chat*
 // @version     1.0.1
+// @updateURL   https://raw.githubusercontent.com/seagull-kamome/yt-livechat-wipe/main/yt-livechat-wipe.user.js
 // @require     https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/js/toastr.min.js
 // @resource    toastrCSS https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/css/toastr.min.css
 // @grant       GM_addStyle
