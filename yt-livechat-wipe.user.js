@@ -97,7 +97,7 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
   /* ********************************************************************** */
   // Message inspector
   const chatmessage_inspector = async x => {
-      x.classList.remove(['ytlw-bann-words', 'ytlw-bann-accounts', 'ytlw-safe-accounts']);
+      x.classList.remove('ytlw-bann-words', 'ytlw-bann-accounts', 'ytlw-safe-accounts');
 
       // Extract author information, and check it.
       const author_photo = x.querySelector('#author-photo > img');
