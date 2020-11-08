@@ -18,7 +18,8 @@
 
   /* ********************************************************************** */
   const photouri_regexp = new RegExp(
-    '^https://yt3.ggpht.com/([^/]*)/AAAAAAAAAAI/AAAAAAAAAAA/([^/]*)/.*/photo\.jpg$');
+   '^https://yt3.ggpht.com/(?:([^/]*)/AAAAAAAAAAI/AAAAAAAAAAA/([^/]*)/.*/photo\.jpg$' +
+                          '|a/([^/=]+)=)');
 
   /* ********************************************************************** */
   // Manupukate configuration.
@@ -103,7 +104,10 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
       const author_photo = x.querySelector('#author-photo > img');
       const author_photo_uri = author_photo.getAttribute('src') || '';
       const author_name = x.querySelector('#author-name').innerText;
-      const author_key = (y => author_name + '/' + y[1] + '/' + y[2])(author_photo_uri.match(photouri_regexp));
+      const author_key = (y => {
+          if (!y) { console.log('Unknown photo uri:' + author_photo_uri); }
+          else { return author_name + '/' + (y[1]||y[3]) + '/' + (y[2]||'') }
+        })(author_photo_uri.match(photouri_regexp));
       if (config.inspected_accounts[author_key] === 'BANN') {
         x.classList.add('ytlw-bann-accounts');
       } else if (config.inspected_accounts[author_key] === 'SAFE') {
@@ -120,7 +124,8 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
 
       // Enable drag
       author_photo.ondragstart = e => {
-          e.dataTransfer.setData('text/plain', author_name);
+          e.dataTransfer.setData('text/ytlw-author-key', author_key);
+          e.dataTransfer.setData('text/plain', author_key);
           e.dataTransfer.setData('text/uri-list', author_photo_uri);
         };
     };
@@ -128,7 +133,6 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
       document.querySelectorAll('yt-live-chat-text-message-renderer, yt-live-chat-paid-message-renderer')
         .forEach(chatmessage_inspector);
     };
-  force_inspect_all_messages();
 
   (new MutationObserver(xs => {
     xs.forEach(x => {
@@ -233,12 +237,11 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
     .forEach(elm => {
        elm.ondragover = e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; };
        elm.ondrop = e => {
-          const xs = e.dataTransfer.getData('text/uri-list').match(photouri_regexp);
-          if (!xs) { return; }
+          const k = e.dataTransfer.getData('text/ytlw-author-key');
+          if (!k) { return; }
 
           e.stopPropagation();
           e.preventDefault();
-          const k = e.dataTransfer.getData('text/plain') + '/' + xs[1] + '/' + xs[2];
           const typ = elm.getAttribute('ytlw-bann-type') || 'ERROR';
           if (typ === 'NUTRAL') {
             delete config.inspected_accounts[k];
@@ -254,5 +257,7 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
           force_inspect_all_messages(); // Update view
         };
     });
+
+  force_inspect_all_messages();
 })();
 
