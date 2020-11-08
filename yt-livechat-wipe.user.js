@@ -29,7 +29,7 @@
       inspected_accounts: { },
     };
   (GM_getValue('YTLW_BANN_ACCOUNTS')||'').split(/\r?\n/g).forEach(
-      x => config.inspected_accounts[x] === 'BANN');
+      x => { config.inspected_accounts[x] = 'BANN'; });
 
   const fix_config = () => {
       config.bann_words_regexp = new RegExp(
