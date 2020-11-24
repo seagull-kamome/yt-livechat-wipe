@@ -111,8 +111,10 @@ ul.ytlw-dropdownmenu > li { display: inline-block; padding: 0 1ex 0 1ex;
    border:1px solid white; position: relative; }
 ul.ytlw-dropdownmenu > li.ytlw-accept-drragndrop:-moz-drag-over { border 1px solid green; }
 
-ul.ytlw-dropdownmenu > li > ul { position: absolute; margin: 0; padding: 0 1ex 0 1ex;
+ul.ytlw-dropdownmenu > li > ul { position: absolute;
   left: 0; background: black; list-style: none; display: none; overflow: none; }
+ul.ytlw-dropdownmenu > li > ul > li { mergin: 0 1ex 0 1ex; padding: 0 1ex 0 1ex; }
+ul.ytlw-dropdownmenu > li > ul > li:hover { border: white 1px solid: }
 ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 
 `);
@@ -275,7 +277,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     });
 
   const do_cmd_reset_accounts = k => {
-      Object.kesy(config.inspected_accounts).forEach(x => {
+      Object.keys(config.inspected_accounts).forEach(x => {
           if (config.inspected_accounts[x] === k) { delete config.inspected_accounts[k]; } }); };
   document.querySelector('#ytlw-cmd-reset-bann-accounts').onclick = () => do_cmd_reset_accounts('BANN');
   document.querySelector('#ytlw-cmd-reset-safe-accounts').onclick = () => do_cmd_reset_accounts('SAFE');
