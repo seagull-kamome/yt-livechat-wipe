@@ -18,8 +18,16 @@
 
   /* ********************************************************************** */
   const photouri_regexp = new RegExp(
-   '^https://yt3.ggpht.com/(?:([^/]*)/AAAAAAAAAAI/AAAAAAAAAAA/([^/]*)/.*/photo\.jpg$' +
-                          '|a/([^/=]+)=)');
+   '^https://yt3.ggpht.com/(?:([^/]*)/AAAAAAAAAAI/AAAAAAAAAAA/([^/]*)/.*/photo\.jpg$'
+                        + '|((?:a|ytc)/[^/=]+)=)');
+  const emoji_regexp = new RegExp(
+    '[\u2700-\u27BF]'
+    + '|[\uE000-\uF8FF]'
+    + '|\uD83C[\uDC00-\uDFFF]'
+    + '|\uD83D[\uDC00-\uDFFF]'
+    + '|[\u2011-\u26FF]'
+    + '|\uD83E[\uDD10-\uDDFF]', 'g');
+
 
   /* ********************************************************************** */
   // Manupukate configuration.
@@ -31,12 +39,20 @@
     };
   (GM_getValue('YTLW_BANN_ACCOUNTS')||'').split(/\r?\n/g).forEach(
       x => { config.inspected_accounts[x] = 'BANN'; });
+  (GM_getValue('YTLW_SAFE_ACCOUNTS')||'').split(/\r?\n/g).forEach(
+      x => { config.inspected_accounts[x] = 'SAFE'; });
+
 
   const fix_config = () => {
       config.bann_words_regexp = new RegExp(
         config.bann_words.replace(/\r?\n/g, '|'), 'i');
 
+      // Save bann list.
       GM_setValue('YTLW_BANN_WORDS', config.bann_words);
+      GM_setValue('YTLW_BANN_ACCOUNTS',
+        Object.keys(config.inspected_accounts).filter(x => config.inspected_accounts[x] === 'BANN').join("\n") );
+      GM_setValue('YTLW_SAFE_ACCOUNTS',
+        Object.keys(config.inspected_accounts).filter(x => config.inspected_accounts[x] === 'SAFE').join("\n") );
     };
   fix_config();
 
@@ -67,7 +83,6 @@
   font-weight: 500;
   color: var(--yt-spec-text-secondary);
 }
-.ytlw-ngbutton { fill: #fff; }
 .toast { font-size: 14px; }
 
 .ytlw-guest-hidden yt-live-chat-item-list-renderer
@@ -91,15 +106,21 @@ yt-live-chat-membership-item-renderer { display: none!important; }
 .ytlw-deleted-message-hidden yt-live-chat-item-list-renderer
 yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
 
-#ytlw-bann-button:-moz-drag-over { border: 1px solid black; }
+ul.ytlw-dropdownmenu { list-style: none; overflow: none; }
+ul.ytlw-dropdownmenu > li { display: inline-block; padding: 0 1ex 0 1ex;
+   border:1px solid white; position: relative; }
+ul.ytlw-dropdownmenu > li.ytlw-accept-drragndrop:-moz-drag-over { border 1px solid green; }
+
+ul.ytlw-dropdownmenu > li > ul { position: absolute; margin: 0; padding: 0 1ex 0 1ex;
+  left: 0; background: black; list-style: none; display: none; overflow: none; }
+ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
+
 `);
 
 
   /* ********************************************************************** */
   // Message inspector
   const chatmessage_inspector = async x => {
-      x.classList.remove('ytlw-bann-words', 'ytlw-bann-accounts', 'ytlw-safe-accounts');
-
       // Extract author information, and check it.
       const author_photo = x.querySelector('#author-photo > img');
       const author_photo_uri = author_photo.getAttribute('src') || '';
@@ -108,19 +129,20 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
           if (!y) { console.log('Unknown photo uri:' + author_photo_uri); }
           else { return author_name + '/' + (y[1]||y[3]) + '/' + (y[2]||'') }
         })(author_photo_uri.match(photouri_regexp));
-      if (config.inspected_accounts[author_key] === 'BANN') {
-        x.classList.add('ytlw-bann-accounts');
-      } else if (config.inspected_accounts[author_key] === 'SAFE') {
-        x.classList.add('ytlw-safe-accounts');
-      }
+
+      x.classList.toggle('ytlw-bann-accounts', (config.inspected_accounts[author_key] === 'BANN'));
+      x.classList.toggle('ytlw-safe-accounts', (config.inspected_accounts[author_key] === 'SAFE'));
 
       // Extract message text, and check it.
       const post_time = x.querySelector('#timestamp').innerText;
       const message = x.querySelector('#message').innerText;
-      if (!!config.bann_words_regexp && config.bann_words != ''
-       && (config.bann_words_regexp.test(author_name) || config.bann_words_regexp.test(message)) ) {
-        x.classList.add('ytlw-bann-words');
-      }
+      const sanity_msg = message.replace(emoji_regexp, '');
+
+      x.classList.toggle('ytlw-bann-words',
+        (!!config.bann_words_regexp && config.bann_words != ''
+         && (config.bann_words_regexp.test(author_name)
+             || config.bann_words_regexp,test(sanity_msg)
+             || config.bann_words_regexp.test(message)) ) );
 
       // Enable drag
       author_photo.ondragstart = e => {
@@ -177,21 +199,24 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
       </div>
       <div>
         <span>Bann words: (regexp)</span>
+        <button id='ytlw-popup-apply'>Save</button>
       </div>
       <div>
         <textarea id='ytlw-popup-bannwords' rows='4' style='resize:holizontal; width:100%;'></textarea>
       </div>
       <div>
-        <button id='ytlw-popup-apply'>Save</button>
-      </div>
-      <div>
         <spam>Drop user icon to categolize:</span>
       </dov>
       <div>
-        <span class='ytlw-bann-button' ytlw-bann-type='BANN'>[ BANN ]</span>
-        : <span class='ytlw-bann-button' ytlw-bann-type='NUTRAL'>[ NUTRAL ]</span>
-        : <span class='ytlw-bann-button' ytlw-bann-type='SAFE'>[ SAFE ]</span>
-      </div>
+        <ul class='ytlw-dropdownmenu'>
+          <li class='ytlw-bann-button ytlw-accept-dragndrop' ytlw-bann-type='BANN'>BANN
+            <ul><li id='ytlw-cmd-show-bann-accounts'>Show</li>
+                <li id='ytlw-cmd-reset-bann-accounts'>Reset</li></ul><//li>
+          <li class='ytlw-bann-button ytlw-accept-dragndrop' ytlw-bann-type='NUTRAL'>NUTRAL</li>
+          <li class='ytlw-bann-button ytlw-accept-drawndrop' ytlw-bann-type='SAFE'>SAFE
+            <ul><li id='ytlw-cmd-show-safe-accounts'>Show</li>
+                <li id='ytlw-cmd-reset-safe-accounts'>Reset</li></ul></li>
+        </ul>
       </div>
     </div>
   </div>
@@ -220,21 +245,17 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
     .forEach(x => {
         // when member type filter changed.
         const c = 'ytlw-' + x.name + '-hidden';
-        x.onchange = () => {
-            if (x.checked) {
-              document.body.classList.remove(c);
-            } else {
-              document.body.classList.add(c);
-            } }; });
+        x.onchange = () => { document.body.classList.toggle(c, !x.checked); }; });
   document.getElementById('ytlw-popup-apply').onclick = x => {
-      // when "Apply" pressed.
+      // when "Save" pressed.
       config.bann_words = bann_word_textarea.value;
       fix_config();
       force_inspect_all_messages(); };
 
   // Bann button
-  const bannbutton = document.querySelectorAll('.ytlw-bann-button')
+  document.querySelectorAll('.ytlw-bann-button')
     .forEach(elm => {
+       const typ = elm.getAttribute('ytlw-bann-type') || 'ERROR';
        elm.ondragover = e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; };
        elm.ondrop = e => {
           const k = e.dataTransfer.getData('text/ytlw-author-key');
@@ -242,21 +263,22 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
 
           e.stopPropagation();
           e.preventDefault();
-          const typ = elm.getAttribute('ytlw-bann-type') || 'ERROR';
           if (typ === 'NUTRAL') {
             delete config.inspected_accounts[k];
           } else if (typ === 'BANN' || typ == 'SAFE') {
             config.inspected_accounts[k] = typ;
           } else { return ; }
 
-          // Save bann list.
-          GM_setValue('YTLW_BANN_ACCOUNTS',
-          Object.keys(config.inspected_accounts).filter(x => {
-              return config.inspected_accounts[x] === 'BANN'; }).join("\n") );
-
+          fix_config();
           force_inspect_all_messages(); // Update view
         };
     });
+
+  const do_cmd_reset_accounts = k => {
+      Object.kesy(config.inspected_accounts).forEach(x => {
+          if (config.inspected_accounts[x] === k) { delete config.inspected_accounts[k]; } }); };
+  document.querySelector('#ytlw-cmd-reset-bann-accounts').onclick = () => do_cmd_reset_accounts('BANN');
+  document.querySelector('#ytlw-cmd-reset-safe-accounts').onclick = () => do_cmd_reset_accounts('SAFE');
 
   force_inspect_all_messages();
 })();
