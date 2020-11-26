@@ -158,7 +158,6 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     const is_spoofing = (author_name in config.inspected_members)? is_guest : false;
     if (is_spoofing) {
       config.detected_spammers[author_key] = {
-        channel_id: xx.authorExternalChannelId,
         param: xx.contextMenuEndpoint.liveChatItemContextMenuEndpoint.param };
     }
     x.classList.toggle('ytlw-spoofing', is_spoofing);
@@ -219,11 +218,11 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       <div>
         <ul class='ytlw-dropdownmenu'>
           <li class='ytlw-bann-button ytlw-accept-dragndrop' ytlw-bann-type='BANN'>BANN
-            <ul><li id='ytlw-cmd-show-bann-accounts'>Show</li>
+            <ul><!-- li id='ytlw-cmd-show-bann-accounts' Show /li -->
                 <li id='ytlw-cmd-reset-bann-accounts'>Reset</li></ul><//li>
           <li class='ytlw-bann-button ytlw-accept-dragndrop' ytlw-bann-type='NUTRAL'>NUTRAL</li>
           <li class='ytlw-bann-button ytlw-accept-drawndrop' ytlw-bann-type='SAFE'>SAFE
-            <ul><li id='ytlw-cmd-show-safe-accounts'>Show</li>
+            <ul><!-- li id='ytlw-cmd-show-safe-accounts' Show /li -->
                 <li id='ytlw-cmd-reset-safe-accounts'>Reset</li></ul></li>
         </ul>
       </div>
@@ -307,11 +306,11 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         };
     });
 
-  const do_cmd_reset_accounts = k => {
+  const do_cmd_reset_account_list = k => {
       Object.keys(config.inspected_accounts).forEach(x => {
           if (config.inspected_accounts[x] === k) { delete config.inspected_accounts[k]; } }); };
-  document.querySelector('#ytlw-cmd-reset-bann-accounts').onclick = () => do_cmd_reset_accounts('BANN');
-  document.querySelector('#ytlw-cmd-reset-safe-accounts').onclick = () => do_cmd_reset_accounts('SAFE');
+  document.querySelector('#ytlw-cmd-reset-bann-accounts').onclick = () => do_cmd_reset_account_list('BANN');
+  document.querySelector('#ytlw-cmd-reset-safe-accounts').onclick = () => do_cmd_reset_account_list('SAFE');
 
   force_inspect_all_messages();
 })();
