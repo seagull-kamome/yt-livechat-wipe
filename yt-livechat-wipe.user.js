@@ -37,6 +37,9 @@
       bann_words_regexp: null,
 
       inspected_accounts: { },
+      inspected_members: { },
+
+      detected_spammers: { }
     };
   (GM_getValue('YTLW_BANN_ACCOUNTS')||'').split(/\r?\n/g).forEach(
       x => { config.inspected_accounts[x] = 'BANN'; });
@@ -109,6 +112,7 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
 
 .ytlw-too-much-emoji-hideen yt-live-chat-item-list-renderer
 yt-live-chat-text-message-renderer[author-type=''].ytlw-too-much-emoji { display: none!important; }
+.ytlw-spoofing-hidden yt-live-chat-item-list-renderer .ytlw-spoofing { display: none!important; }
 
 ul.ytlw-dropdownmenu { list-style: none; overflow: none; }
 ul.ytlw-dropdownmenu > li { display: inline-block; padding: 0 1ex 0 1ex;
@@ -127,34 +131,55 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
   /* ********************************************************************** */
   // Message inspector
   const chatmessage_inspector = async x => {
-      const author_photo = x.querySelector('#author-photo > img');
-//      const author_photo_uri = author_photo.getAttribute('src') || '';
-//      const author_name = x.querySelector('#author-name').innerText;
-      const author_photo_uri = x.__data.data.authorPhoto.thumbnails[0].url || '';
-      const author_name = x.__data.data.authorName.simpleText || '';
-      const author_key = (y => {
-          if (!y) { console.log('Unknown photo uri:' + author_photo_uri); }
-          else { return author_name + '/' + (y[1]||y[3]) + '/' + (y[2]||'') }
-        })(author_photo_uri.match(photouri_regexp));
-//      const post_time = x.querySelector('#timestamp').innerText;
-//      const message = x.querySelector('#message').innerText;
-      const message = x.__data.data.message.runs.map(y => y.text || '').join('');
-      const sanity_msg = message.replace(emoji_regexp, '');
+    const xx = x.__data.data; // just for shorthand
 
-      x.classList.toggle('ytlw-bann-accounts', (config.inspected_accounts[author_key] === 'BANN'));
-      x.classList.toggle('ytlw-safe-accounts', (config.inspected_accounts[author_key] === 'SAFE'));
-      x.classList.toggle('ytlw-bann-words',
-        (!!config.bann_words_regexp && config.bann_words !== ''
-         && config.bann_words_regexp.test(author_name + '\n' + sanity_msg + '\n' + message)) );
-      x.classList.toggle('ytlw-too-much-emoji', (message.length - sanity_msg.length > ALLOWED_EMOJI_LIMIT));
-//      console.log(author_name + '\n' + sanity_msg + '\n' + message);
+    //
+    //
+    //
+    const author_photo = x.querySelector('#author-photo > img');
+//    const author_photo_uri = author_photo.getAttribute('src') || '';
+//    const author_name = x.querySelector('#author-name').innerText;
+    const author_photo_uri = xx.authorPhoto.thumbnails[0].url || '';
+    const author_name = xx.authorName.simpleText || '';
+    const author_key = xx.authorExternalChannelId || (y => {
+      console.log('no channel id of ' + author_name + ' : ' + author_photo_uri);
+      if (!y) { console.log('Unknown photo uri:' + author_photo_uri); }
+      else { return author_name + '/' + (y[1]||y[3]) + '/' + (y[2]||'') }
+    })(author_photo_uri.match(photouri_regexp));
+    x.classList.toggle('ytlw-bann-accounts', (config.inspected_accounts[author_key] === 'BANN'));
+    x.classList.toggle('ytlw-safe-accounts', (config.inspected_accounts[author_key] === 'SAFE'));
 
-      // Enable drag
-      author_photo.ondragstart = e => {
-          e.dataTransfer.setData('text/ytlw-author-key', author_key);
-          e.dataTransfer.setData('text/plain', author_key);
-          e.dataTransfer.setData('text/uri-list', author_photo_uri);
-        };
+    const is_guest = xx.authorBadges.length == 0? true : false;
+    if (! is_guest && !(author_name in config.inspected_members)) {
+        console.log('Found member : ' + author_name + ' (' + author_key + ')');
+        config.inspected_members[author_name] = { key: author_key };
+    }
+
+    const is_spoofing = (author_name in config.inspected_members)? is_guest : false;
+    if (is_spoofing) {
+      config.detected_spammers[author_key] = {
+        channel_id: xx.authorExternalChannelId,
+        param: xx.contextMenuEndpoint.liveChatItemContextMenuEndpoint.param };
+    }
+    x.classList.toggle('ytlw-spoofing', is_spoofing);
+
+//    const post_time = x.querySelector('#timestamp').innerText;
+//    const message = x.querySelector('#message').innerText;
+    const message = xx.message.runs.map(y => y.text || '').join('');
+    const sanity_msg = message.replace(emoji_regexp, '');
+    x.classList.toggle('ytlw-bann-words',   // test BANN words.
+      (!!config.bann_words_regexp && config.bann_words !== ''
+       && config.bann_words_regexp.test(author_name + '\n' + sanity_msg + '\n' + message)) );
+
+    x.classList.toggle('ytlw-too-much-emoji', (message.length - sanity_msg.length > ALLOWED_EMOJI_LIMIT));
+//    console.log(author_name + '\n' + sanity_msg + '\n' + message);
+
+    // Enable drag
+    author_photo.ondragstart = e => {
+        e.dataTransfer.setData('text/ytlw-author-key', author_key);
+        e.dataTransfer.setData('text/plain', author_key);
+        e.dataTransfer.setData('text/uri-list', author_photo_uri);
+      };
     };
   const force_inspect_all_messages = () => {
       document.querySelectorAll('yt-live-chat-text-message-renderer, yt-live-chat-paid-message-renderer')
@@ -216,7 +241,8 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         <input type='checkbox' name='banned-account' checked='checked' />Banned account
         <input type='checkbox' name='banned-words' checked='checked' />Banned word
         <input type='checkbox' name='deleted-message' checked='checked' />Deleted<br />
-        <input type='checkbox' name='too-much-emoji' checked='checked' />Too much emoji
+        <input type='checkbox' name='too-much-emoji' checked='checked' />Too much emojis
+        <input type='checkbox' name='spoofing' checked='checked' />Spoofing
       </div>
       <div>
         <span>Bann words: (regexp)</span>
