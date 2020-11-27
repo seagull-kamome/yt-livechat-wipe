@@ -232,7 +232,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     //
     // Enable click
     //
-    author_photo.onclick = e => {
+    author_photo.addEventListener('click', e => {
       console.log('aaa');
         document.getElementById('ytlw-author-info-name').innerText = author_name;
         document.getElementById('ytlw-author-channel').setAttribute('href',
@@ -241,7 +241,8 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
           (author_info.typ||'')
           + ' - ' + ((author_key in config.detected_spammers)? 'SPAMMER':'');
         document.getElementById('ytlw-author-info-panel').style.visibility = 'visible';
-      };
+      });
+
     };
   const force_inspect_all_messages = () => {
       document.querySelectorAll('yt-live-chat-text-message-renderer, yt-live-chat-paid-message-renderer')
@@ -355,15 +356,16 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 
   const popup = document.getElementById('ytlw-setting-panel');
   const bann_word_textarea = popup.querySelector('#ytlw-popup-bannwords');
-  document.getElementById('ytlw-setting-button').onclick = () => {
+  document.getElementById('ytlw-setting-button').addEventListener('click', () => {
       // when popup button pressed, popup the panel.
       bann_word_textarea.value = config.bann_words;
       popup.style.visibility = (popup.style.visibility == 'visible')? 'hidden' : 'visible';
-    };
+    });
 
-  popup.querySelector('#ytlw-btn-close-author-info-panel').onclick = () => {
+  popup.querySelector('#ytlw-btn-close-author-info-panel')
+    .addEventListener('click',() => {
       popup.querySelector('#ytlw-author-info-panel').style.visibility = 'hidden';
-    };
+    });
 
   // Setting actions.
   document.querySelectorAll("#ytlw-popup-hide-by-member-type input[type='checkbox']")
@@ -371,18 +373,21 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         // when member type filter changed.
         const c = 'ytlw-' + x.name + '-hidden';
         x.onchange = () => { document.body.classList.toggle(c, !x.checked); }; });
-  document.getElementById('ytlw-popup-apply').onclick = x => {
+  document.getElementById('ytlw-popup-apply').addEventListener('click', x => {
       // when "Save" pressed.
       config.bann_words = bann_word_textarea.value;
       fix_config();
-      force_inspect_all_messages(); };
+      force_inspect_all_messages(); });
 
   // Bann button
   document.querySelectorAll('.ytlw-bann-button')
     .forEach(elm => {
        const typ = elm.getAttribute('ytlw-bann-type') || 'ERROR';
-       elm.ondragover = e => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; };
-       elm.ondrop = e => {
+       elm.addEventListener('dragover', e => {
+         e.preventDefault();
+         e.stopPropagation();
+         e.dataTransfer.dropEffect = 'copy'; });
+       elm.addEventListener('drop',e => {
           const k = e.dataTransfer.getData('text/ytlw-author-key');
           if (!k) { return; }
 
@@ -394,14 +399,17 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 
           fix_config();
           force_inspect_all_messages(); // Update view
-        };
+        });
     });
 
-  const do_cmd_reset_account_list = k => {
+  const do_cmd_reset_account_list = k => () => {
       Object.keys(config.inspected_accounts).forEach(x => {
-          if (config.inspected_accounts[x].typ === k) { config.inspected_accounts[k].typ = 'NUTRAL'; } }); };
-  document.querySelector('#ytlw-cmd-reset-bann-accounts').onclick = () => do_cmd_reset_account_list('BANN');
-  document.querySelector('#ytlw-cmd-reset-safe-accounts').onclick = () => do_cmd_reset_account_list('SAFE');
+          if (config.inspected_accounts[x].typ === k) {
+            config.inspected_accounts[k].typ = 'NUTRAL'; } }); };
+  document.querySelector('#ytlw-cmd-reset-bann-accounts')
+    .addEventListener('click', do_cmd_reset_account_list('BANN'));
+  document.querySelector('#ytlw-cmd-reset-safe-accounts')
+    .addEventListener('click', do_cmd_reset_account_list('SAFE'));
 
   force_inspect_all_messages();
 })();
