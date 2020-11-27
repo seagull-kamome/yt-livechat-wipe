@@ -50,11 +50,6 @@
 
       detected_spammers: { },
     };
-  (GM_getValue('YTLW_BANN_ACCOUNTS')||'').split(/\r?\n/g).forEach(
-      x => { config.inspected_accounts[x] = { typ: 'BANN' }; });
-  (GM_getValue('YTLW_SAFE_ACCOUNTS')||'').split(/\r?\n/g).forEach(
-      x => { config.inspected_accounts[x] = { typ: 'SAFE' }; });
-
 
   const fix_config = () => {
       config.bann_words_regexp = new RegExp(
@@ -70,25 +65,42 @@
   fix_config();
 
 
+  const get_author_info = k => {
+      if (! (k in config.inspected_accounts)) {
+        var tmp = { typ: 'NUTRAL', timestamps: {} };
+        config.inspected_accounts[k] = tmp;
+        return tmp;
+      }
+      return config.inspected_accounts[k];
+    };
+
+  (GM_getValue('YTLW_BANN_ACCOUNTS')||'').split(/\r?\n/g)
+    .forEach(x => { get_author_info(k).typ = 'BANN'; });
+  (GM_getValue('YTLW_SAFE_ACCOUNTS')||'').split(/\r?\n/g)
+    .forEach(x => { get_author_info(k).typ = 'SAFE'; });
+
+
  /* ********************************************************************** */
   // Inject stylesheet.
   GM_addStyle(GM_getResourceText('toasterCSS'));
   GM_addStyle(`
 .ytlw-panel {
-  background-color: rgba(30,30,30,0.9);
+  background-color: var(--yt-live-chat-vem-background-color);
   width: auto;
   height: auto;
   z-index: 5;
-  display: inline-block;
+  display: block;
   visibility: hidden;
   position: absolute;
   bottom: 35px;
   right: 10px;
   padding: 10px;
-  color: #fff;
+  color: var(--yt-live-chat-primary-text-color);
   font-size: 14px;
 }
-.tylw-panel-box { width: 210px; float: left; padding-left: 5px; }
+.tylw-panel-box {
+  width: 210px; float: left; padding-left: 5px;
+}
 .ytlw-button {
   display: inline-block;
   border-style: none;
@@ -125,13 +137,13 @@ yt-live-chat-text-message-renderer[author-type=''].ytlw-excess-emoji { display: 
 
 ul.ytlw-dropdownmenu { list-style: none; overflow: none; }
 ul.ytlw-dropdownmenu > li { display: inline-block; padding: 0 1ex 0 1ex;
-   border:1px solid white; position: relative; }
+   border:1px solid black; position: relative; }
 ul.ytlw-dropdownmenu > li.ytlw-accept-drragndrop:-moz-drag-over { border 1px solid green; }
 
 ul.ytlw-dropdownmenu > li > ul { position: absolute;
-  left: 0; background: black; list-style: none; display: none; overflow: none; }
+  left: 0; list-style: none; display: none; overflow: none; }
 ul.ytlw-dropdownmenu > li > ul > li { mergin: 0 1ex 0 1ex; padding: 0 1ex 0 1ex; }
-ul.ytlw-dropdownmenu > li > ul > li:hover { border: white 1px solid: }
+ul.ytlw-dropdownmenu > li > ul > li:hover { border: black 1px solid: }
 ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 
 `);
@@ -154,9 +166,9 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       if (!y) { console.log('Unknown photo uri:' + author_photo_uri); }
       else { return author_name + '/' + (y[1]||y[3]) + '/' + (y[2]||'') }
     })(author_photo_uri.match(photouri_regexp));
-    const is_guest = xx.authorBadges.length == 0? true : false;
+    const is_guest = (('authorBadges' in xx) && xx.authorBadges.length == 0)? true : false;
 
-    let author_info = config.inspected_accounts[author_key];
+    let author_info = get_author_info(author_key);
     x.classList.toggle('ytlw-bann-accounts', (author_info.typ === 'BANN'));
     x.classList.toggle('ytlw-safe-accounts', (author_info.typ === 'SAFE'));
 
@@ -167,8 +179,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     if (timestamp_5sec > config.maximum_timestamp)
       config.maximum_timestamp = timestamp_5sec;
 
-    if (! ('timestamps' in author_info)) author_info.timestamps = { };
-    let author_timestamps = author_info.timestamps || { };
+    let author_timestamps = author_info.timestamps;
     if (! rescan) {
       // update timestamps
       author_timestamps[timestamp_5sec] = (author_timestamps[timestamp_5sec] || 0) + 1;
@@ -233,14 +244,12 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     // Enable click
     //
     author_photo.addEventListener('click', e => {
-      console.log('aaa');
         document.getElementById('ytlw-author-info-name').innerText = author_name;
         document.getElementById('ytlw-author-channel').setAttribute('href',
           'https://youtube.com/channel/' + xx.authorExternalChannelId);
         document.getElementById('ytlw-author-info-detail').innerText =
           (author_info.typ||'')
           + ' - ' + ((author_key in config.detected_spammers)? 'SPAMMER':'');
-        document.getElementById('ytlw-author-info-panel').style.visibility = 'visible';
       });
 
     };
@@ -330,13 +339,12 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       <div>
         <textarea id='ytlw-popup-bannwords' rows='4' style='resize:holizontal; width:100%;'></textarea>
       </div>
-      <div id='ytlw-author-info-panel' style='visibility: hidden;'>
+      <div>
         <p>
           Author info of
-          <a id='ytlw-author-channel' href='#'>
+          <a id='ytlw-author-channel' target='_blank' href='#'>
             <span id='ytlw-author-info-name'></span>
           </a> .
-          <button id='ytlw-btn-close-author-info-panel'>close</button>
         </p>
         <p id='ytlw-author-info-detail'></p>
       </div>
@@ -345,7 +353,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
 </div>
 <button type='button' name='panelbutton' value='panelbutton' class='ytlw-button'
     id='ytlw-setting-button'
-    style="background: rgba(0,0,0,0); white-space: nowrap;">
+    style="white-space: nowrap;">
   <span>[Filter]</span>
 </button>`
 
@@ -360,11 +368,6 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       // when popup button pressed, popup the panel.
       bann_word_textarea.value = config.bann_words;
       popup.style.visibility = (popup.style.visibility == 'visible')? 'hidden' : 'visible';
-    });
-
-  popup.querySelector('#ytlw-btn-close-author-info-panel')
-    .addEventListener('click',() => {
-      popup.querySelector('#ytlw-author-info-panel').style.visibility = 'hidden';
     });
 
   // Setting actions.
