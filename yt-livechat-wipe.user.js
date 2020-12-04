@@ -16,13 +16,13 @@
 (function () {
   'use strict';
 
-  const MESSAGE_RATE_LIMIT_5 = 5;
-  const MESSAGE_RATE_LIMIT_10 = 7;
-  const MESSAGE_RATE_LIMIT_20 = 10;
+  const MESSAGE_RATE_LIMIT_10 = 5;
+  const MESSAGE_RATE_LIMIT_20 = 4;
+  const MESSAGE_RATE_LIMIT_60 = 6;
 
-  const MESSAGE_BLOCK_RATE_LIMIT_5 = 6;
-  const MESSAGE_BLOCK_RATE_LIMIT_10 = 10;
-  const MESSAGE_BLOCK_RATE_LIMIT_20 = 20;
+  const MESSAGE_BLOCK_RATE_LIMIT_10 = 7;
+  const MESSAGE_BLOCK_RATE_LIMIT_20 = 8;
+  const MESSAGE_BLOCK_RATE_LIMIT_60 = 10;
 
   /* ********************************************************************** */
   const photouri_regexp = new RegExp(
@@ -135,6 +135,10 @@ yt-live-chat-text-message-renderer[is-deleted] { display: none!important; }
 yt-live-chat-text-message-renderer[author-type=''].ytlw-excess-emoji { display: none!important; }
 .ytlw-spoofing-hidden yt-live-chat-item-list-renderer .ytlw-spoofing { display: none!important; }
 
+.ytlw-highrate-10-hidden yt-live-chat-item-list-renderer .ytlw-highrate-10 { display: none!important; }
+.ytlw-highrate-20-hidden yt-live-chat-item-list-renderer .ytlw-highrate-20 { display: none!important; }
+.ytlw-highrate-60-hidden yt-live-chat-item-list-renderer .ytlw-highrate-60 { display: none!important; }
+
 ul.ytlw-dropdownmenu { list-style: none; overflow: none; }
 ul.ytlw-dropdownmenu > li { display: inline-block; padding: 0 1ex 0 1ex;
    border:1px solid black; position: relative; }
@@ -166,7 +170,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       if (!y) { console.log('Unknown photo uri:' + author_photo_uri); }
       else { return author_name + '/' + (y[1]||y[3]) + '/' + (y[2]||'') }
     })(author_photo_uri.match(photouri_regexp));
-    const is_guest = (('authorBadges' in xx) && xx.authorBadges.length == 0)? true : false;
+    const is_guest = (('authorBadges' in xx) && xx.authorBadges.length > 0)?  false : false;
 
     let author_info = get_author_info(author_key);
     x.classList.toggle('ytlw-bann-accounts', (author_info.typ === 'BANN'));
@@ -175,24 +179,26 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
     //
     // Detect high rate posts.
     //
-    const timestamp_5sec = xx.timestampUsec / 5000;
-    if (timestamp_5sec > config.maximum_timestamp)
-      config.maximum_timestamp = timestamp_5sec;
+    const timestamp_10sec = Math.floor(xx.timestampUsec / 10000);
+    if (timestamp_10sec > config.maximum_timestamp)
+      config.maximum_timestamp = timestamp_10sec;
 
     let author_timestamps = author_info.timestamps;
-    if (! rescan) {
+    if (!rescan && is_guest && x.nodeName.toLowerCase() !== 'yt-live-chat-paid-message-renderer') {
       // update timestamps
-      author_timestamps[timestamp_5sec] = (author_timestamps[timestamp_5sec] || 0) + 1;
+      author_timestamps[timestamp_10sec] = (author_timestamps[timestamp_10sec] || 0) + 1;
     }
 
-    const rate_5 = (author_timestamps[timestamp_5sec] || 0);
-    const rate_10 = rate_5 + (author_timestamps[timestamp_5sec - 1] || 0);
-    const rate_20 = rate_10
-                  + (author_timestamps[timestamp_5sec - 2] || 0)
-                  + (author_timestamps[timestamp_5sec - 3] || 0);
-    x.classList.toggle('ytlw-highrate-5', rate_5 > MESSAGE_RATE_LIMIT_5);
+    const rate_10 = (author_timestamps[timestamp_10sec] || 0);
+    const rate_20 = rate_10 + (author_timestamps[timestamp_10sec - 1] || 0);
+    const rate_60 = rate_20
+                  + (author_timestamps[timestamp_10sec - 2] || 0)
+                  + (author_timestamps[timestamp_10sec - 3] || 0)
+                  + (author_timestamps[timestamp_10sec - 4] || 0)
+                  + (author_timestamps[timestamp_10sec - 5] || 0);
     x.classList.toggle('ytlw-highrate-10', rate_10 > MESSAGE_RATE_LIMIT_10);
     x.classList.toggle('ytlw-highrate-20', rate_20 > MESSAGE_RATE_LIMIT_20);
+    x.classList.toggle('ytlw-highrate-60', rate_60 > MESSAGE_RATE_LIMIT_60);
 
 
     //
@@ -281,7 +287,7 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
       let x = config.inspected_accounts[k];
       if ('timestamps' in x) {
         Object.keys(x.timestamps)
-          .filter(t => t < config.maximum_timestamp - (30 * 12))
+          .filter(t => t < config.maximum_timestamp - (30 * 6))
           .forEach(t => delete x.timestamps[t]);
       }
     });
@@ -326,9 +332,9 @@ ul.ytlw-dropdownmenu > li:hover > ul { display: block; }
         <input type='checkbox' name='deleted-message' checked='checked' />Deleted<br />
         <input type='checkbox' name='excess-emoji' checked='checked' />Excess emojis
         <input type='checkbox' name='spoofing' checked='checked' />Spoofing<br />
-        <input type='checkbox' name='highrate-5' checked='checked' />Over ${MESSAGE_RATE_LIMIT_5} posts in 5 sec. <br />
         <input type='checkbox' name='highrate-10' checked='checked' />Over ${MESSAGE_RATE_LIMIT_10} posts in 10 sec. <br />
-        <input type='checkbox' name='highrate-30' checked='checked' />Over ${MESSAGE_RATE_LIMIT_20} posts in 30 sec. <br />
+        <input type='checkbox' name='highrate-20' checked='checked' />Over ${MESSAGE_RATE_LIMIT_20} posts in 20 sec. <br />
+        <input type='checkbox' name='highrate-60' checked='checked' />Over ${MESSAGE_RATE_LIMIT_60} posts in 60 sec. <br />
       </div>
       <div>
         <p>
